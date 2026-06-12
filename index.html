@@ -940,10 +940,11 @@ footer .copy{font-size:.66rem;letter-spacing:.22em;text-transform:uppercase}
 </footer>
 
 <script>
+(function() {
+'use strict';
+
 /* ============================================================
    EDITABLE STATISTICS
-   Update manually, or replace with a fetch() to your API and
-   call renderStats(yourData).
    ============================================================ */
 const STATS = {
   metrics: [
@@ -960,7 +961,7 @@ const STATS = {
 };
 
 /* ============================================================
-   ENGINE — pure vanilla, no libraries
+   ENGINE
    ============================================================ */
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const finePointer = window.matchMedia("(hover:hover) and (pointer:fine)").matches;
@@ -975,12 +976,17 @@ function formatNum(n, d = 0){
 
 /* ---------- Stats markup ---------- */
 function renderStats(data){
-  document.getElementById("statsGrid").innerHTML = data.metrics.map((m, i) => `
+  const statsGrid = document.getElementById("statsGrid");
+  const demoRow = document.getElementById("demoRow");
+  if (!statsGrid || !demoRow) return;
+
+  statsGrid.innerHTML = data.metrics.map((m, i) => `
     <div class="stat" style="transition-delay:${i * 120}ms">
       <div class="stat-num"><span class="cnt" data-target="${m.value}" data-decimals="${m.decimals||0}">0</span><sup>${m.suffix}</sup></div>
       <span class="stat-label">${m.label}</span>
     </div>`).join("");
-  document.getElementById("demoRow").innerHTML = data.demographics.map(d => `
+
+  demoRow.innerHTML = data.demographics.map(d => `
     <div class="demo-item" data-fade>
       <div class="demo-val">${d.value}</div>
       <span class="stat-label">${d.label}</span>
@@ -988,7 +994,7 @@ function renderStats(data){
 }
 renderStats(STATS);
 
-/* ---------- Word splitter (keeps <em>, <span> intact) ---------- */
+/* ---------- Word splitter ---------- */
 function splitWords(el){
   const walk = node => {
     [...node.childNodes].forEach(child => {
@@ -1016,99 +1022,128 @@ document.querySelectorAll("[data-words]").forEach(el => {
   words.forEach((w, i) => w.style.transitionDelay = (i * 32) + "ms");
 });
 
-/* ---------- IntersectionObserver reveals (once) ---------- */
-const io = new IntersectionObserver(entries => {
-  entries.forEach(e => {
-    if (e.isIntersecting){
-      e.target.classList.add("in");
-      if (e.target.classList.contains("stat")){
-        const c = e.target.querySelector(".cnt");
-        if (c && !c.dataset.done){ c.dataset.done = "1"; countUp(c); }
+/* ---------- Count-up ---------- */
+function countUp(el){
+  const target = parseFloat(el.dataset.target);
+  const d = +el.dataset.decimals;
+  const t0 = performance.now(), dur = 1700;
+  function tick(now){
+    const p = Math.min((now - t0) / dur, 1);
+    el.textContent = formatNum(target * easeOutCubic(p), d);
+    if (p < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+/* ---------- IntersectionObserver ---------- */
+let io = null;
+try {
+  io = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting){
+        e.target.classList.add("in");
+        if (e.target.classList.contains("stat")){
+          const c = e.target.querySelector(".cnt");
+          if (c && !c.dataset.done){ c.dataset.done = "1"; countUp(c); }
+        }
+        io.unobserve(e.target);
       }
-      io.unobserve(e.target);
-    }
-  });
-}, { threshold: 0.18 });
+    });
+  }, { threshold: 0.18 });
+} catch(e) {}
 
 function observeAll(){
-  document.querySelectorAll("[data-fade], [data-words], [data-reveal], .stat").forEach(el => {
-    if (reduceMotion){
+  const els = document.querySelectorAll("[data-fade], [data-words], [data-reveal], .stat");
+  if (reduceMotion){
+    els.forEach(el => {
       el.classList.add("in");
       const c = el.querySelector ? el.querySelector(".cnt") : null;
       if (c && !c.dataset.done){
         c.dataset.done = "1";
         c.textContent = formatNum(parseFloat(c.dataset.target), +c.dataset.decimals);
       }
-    } else {
-      io.observe(el);
-    }
-  });
+    });
+  } else if (io) {
+    els.forEach(el => io.observe(el));
+  } else {
+    // Fallback: show all immediately
+    els.forEach(el => el.classList.add("in"));
+  }
 }
 observeAll();
-
-/* ---------- Count-up ---------- */
-function countUp(el){
-  const target = parseFloat(el.dataset.target);
-  const d = +el.dataset.decimals;
-  const t0 = performance.now(), dur = 1700;
-  (function tick(now){
-    const p = Math.min((now - t0) / dur, 1);
-    el.textContent = formatNum(target * easeOutCubic(p), d);
-    if (p < 1) requestAnimationFrame(tick);
-  })(performance.now());
-}
 
 /* ---------- Preloader ---------- */
 const preloader = document.getElementById("preloader");
 const preName = document.getElementById("preName");
-"LC MICHELLE".split("").forEach((ch, i) => {
-  const s = document.createElement("span");
-  if (ch === " "){ s.className = "sp"; s.innerHTML = "&nbsp;"; }
-  else { s.textContent = ch; s.style.transitionDelay = (i * 45) + "ms"; }
-  preName.appendChild(s);
-});
+if (preName) {
+  "LC MICHELLE".split("").forEach((ch, i) => {
+    const s = document.createElement("span");
+    if (ch === " "){ s.className = "sp"; s.innerHTML = "&nbsp;"; }
+    else { s.textContent = ch; s.style.transitionDelay = (i * 45) + "ms"; }
+    preName.appendChild(s);
+  });
+}
 
 let bootDone = false;
 function boot(){
   if (bootDone) return;
   bootDone = true;
+
   if (reduceMotion){
-    preloader.remove();
+    if (preloader) preloader.remove();
     document.body.classList.remove("loading");
-    document.querySelector(".hero").classList.add("ready");
+    const hero = document.querySelector(".hero");
+    if (hero) hero.classList.add("ready");
     return;
   }
-  /* 1. letters in + line + counter */
-  requestAnimationFrame(() => preloader.classList.add("play"));
-  const count = document.getElementById("preCount");
-  const t0 = performance.now(), dur = 1700;
-  (function tick(now){
-    const p = Math.min((now - t0) / dur, 1);
-    count.textContent = Math.round(100 * (1 - Math.pow(1 - p, 2)));
-    if (p < 1) requestAnimationFrame(tick);
-  })(performance.now());
 
-  /* 2. exit letters → 3. curtain up → 4. hero intro */
+  // Start preloader animation
+  if (preloader) requestAnimationFrame(() => preloader.classList.add("play"));
+
+  // Counter animation
+  const count = document.getElementById("preCount");
+  if (count) {
+    const t0 = performance.now(), dur = 1700;
+    function tick(now){
+      const p = Math.min((now - t0) / dur, 1);
+      count.textContent = Math.round(100 * (1 - Math.pow(1 - p, 2)));
+      if (p < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+
+  // Exit sequence
   setTimeout(() => {
-    preName.querySelectorAll("span").forEach((s, i) => s.style.transitionDelay = (i * 18) + "ms");
-    preloader.classList.add("exit");
+    if (preName) {
+      preName.querySelectorAll("span").forEach((s, i) => s.style.transitionDelay = (i * 18) + "ms");
+    }
+    if (preloader) preloader.classList.add("exit");
   }, 2050);
-  setTimeout(() => preloader.classList.add("done"), 2650);
+
+  setTimeout(() => {
+    if (preloader) preloader.classList.add("done");
+  }, 2650);
+
   setTimeout(() => {
     document.body.classList.remove("loading");
-    document.querySelector(".hero").classList.add("ready");
+    const hero = document.querySelector(".hero");
+    if (hero) hero.classList.add("ready");
   }, 2900);
-  setTimeout(() => preloader.remove(), 3900);
+
+  setTimeout(() => {
+    if (preloader) preloader.remove();
+  }, 3900);
 }
+
+// Try to boot on load, fallback to immediate
 window.addEventListener("load", boot);
-setTimeout(boot, 3500); /* fallback if load is slow */
+setTimeout(boot, 100);
 
 /* ============================================================
-   Single rAF loop: marquees, parallax, progress, cursor,
-   magnetic button, watermark, pillar preview
+   ANIMATION LOOP
    ============================================================ */
 
-/* Marquees: loop width = original content width (padding-right compensates the gap) */
+/* Marquees */
 const marquees = [...document.querySelectorAll("[data-marquee]")].map(track => {
   const original = track.innerHTML;
   const m = { el: track, x: 0, speed: parseFloat(track.dataset.speed || "0.5"),
@@ -1119,17 +1154,21 @@ const marquees = [...document.querySelectorAll("[data-marquee]")].map(track => {
       m.copies++;
     }
   };
-  m.loop = track.scrollWidth;       /* one period, includes padding-right = gap */
+  m.loop = track.scrollWidth;
   fill();
   m.recalc = () => { m.loop = track.scrollWidth / m.copies; fill(); };
   return m;
 });
-window.addEventListener("load", () => marquees.forEach(m => m.recalc()));
-if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => marquees.forEach(m => m.recalc()));
+
+function recalcMarquees(){
+  marquees.forEach(m => m.recalc());
+}
+window.addEventListener("load", recalcMarquees);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(recalcMarquees);
 let rsTimer;
 window.addEventListener("resize", () => {
   clearTimeout(rsTimer);
-  rsTimer = setTimeout(() => marquees.forEach(m => m.recalc()), 200);
+  rsTimer = setTimeout(recalcMarquees, 200);
 });
 
 const progressBar = document.getElementById("progressBar");
@@ -1141,9 +1180,9 @@ const dot = document.getElementById("cursorDot");
 const ring = document.getElementById("cursorRing");
 let mx = innerWidth / 2, my = innerHeight / 2, rxp = mx, ryp = my;
 let cursorOn = finePointer && !reduceMotion;
-if (!cursorOn){ dot.style.display = "none"; ring.style.display = "none"; }
+if (!cursorOn){ if (dot) dot.style.display = "none"; if (ring) ring.style.display = "none"; }
 
-if (cursorOn){
+if (cursorOn && dot && ring){
   window.addEventListener("mousemove", e => {
     mx = e.clientX; my = e.clientY;
     dot.style.transform = `translate(${mx}px,${my}px) translate(-50%,-50%)`;
@@ -1151,6 +1190,7 @@ if (cursorOn){
     ring.classList.toggle("is-dark", !!dark);
     dot.classList.toggle("is-dark", !!dark);
   }, { passive:true });
+
   document.addEventListener("mouseover", e => {
     const view = e.target.closest("[data-cursor='view']");
     const link = e.target.closest("a,button");
@@ -1175,7 +1215,7 @@ if (finePointer && !reduceMotion && orb){
 const pillarList = document.getElementById("pillarList");
 const preview = document.getElementById("pillarPreview");
 let pvTX = 0, pvTY = 0, pvX = 0, pvY = 0, pvActive = false;
-if (finePointer && !reduceMotion && pillarList){
+if (finePointer && !reduceMotion && pillarList && preview){
   const slides = preview.querySelectorAll(".slide");
   pillarList.addEventListener("mousemove", e => {
     const r = pillarList.getBoundingClientRect();
@@ -1204,15 +1244,12 @@ function frame(){
   const vh = window.innerHeight;
   const max = document.documentElement.scrollHeight - vh;
 
-  /* velocity (smoothed) */
   velocity = lerp(velocity, y - lastScrollY, 0.12);
   lastScrollY = y;
 
-  /* progress */
   if (progressBar) progressBar.style.transform = `scaleX(${max > 0 ? y / max : 0})`;
 
   if (!reduceMotion){
-    /* marquees */
     marquees.forEach(m => {
       const extra = m.boost ? Math.max(-10, Math.min(10, velocity * 0.35)) : 0;
       m.x -= m.speed + extra;
@@ -1221,7 +1258,6 @@ function frame(){
       m.el.style.transform = `translate3d(${m.x}px,0,0)`;
     });
 
-    /* parallax images */
     parallaxEls.forEach(el => {
       const r = el.getBoundingClientRect();
       if (r.bottom < -100 || r.top > vh + 100) return;
@@ -1229,7 +1265,6 @@ function frame(){
       el.style.transform = `translate3d(0,${(-center * parseFloat(el.dataset.parallax)).toFixed(1)}px,0)`;
     });
 
-    /* watermark drift */
     if (watermark){
       const r = watermark.getBoundingClientRect();
       if (r.bottom > 0 && r.top < vh){
@@ -1238,21 +1273,18 @@ function frame(){
       }
     }
 
-    /* cursor ring lerp */
-    if (cursorOn){
+    if (cursorOn && ring){
       rxp = lerp(rxp, mx, 0.16);
       ryp = lerp(ryp, my, 0.16);
       ring.style.transform = `translate(${rxp}px,${ryp}px) translate(-50%,-50%)`;
     }
 
-    /* magnetic orb lerp */
     if (orb){
       orbX = lerp(orbX, orbTX, 0.12);
       orbY = lerp(orbY, orbTY, 0.12);
       orb.style.transform = `translate(${orbX.toFixed(2)}px,${orbY.toFixed(2)}px)`;
     }
 
-    /* pillar preview follow */
     if (preview && pvActive){
       pvX = lerp(pvX, pvTX, 0.14);
       pvY = lerp(pvY, pvTY, 0.14);
@@ -1268,21 +1300,27 @@ const nav = document.getElementById("nav");
 let lastNavY = 0;
 window.addEventListener("scroll", () => {
   const y = window.scrollY;
-  nav.classList.toggle("scrolled", y > 60);
-  nav.classList.toggle("hidden-nav", y > 420 && y > lastNavY);
+  if (nav) {
+    nav.classList.toggle("scrolled", y > 60);
+    nav.classList.toggle("hidden-nav", y > 420 && y > lastNavY);
+  }
   lastNavY = y;
 }, { passive:true });
 
 const toggle = document.getElementById("navToggle");
 const links = document.getElementById("navLinks");
-toggle.addEventListener("click", () => {
-  toggle.classList.toggle("open");
-  links.classList.toggle("open");
-});
-links.querySelectorAll("a").forEach(a => a.addEventListener("click", () => {
-  toggle.classList.remove("open");
-  links.classList.remove("open");
-}));
+if (toggle && links) {
+  toggle.addEventListener("click", () => {
+    toggle.classList.toggle("open");
+    links.classList.toggle("open");
+  });
+  links.querySelectorAll("a").forEach(a => a.addEventListener("click", () => {
+    toggle.classList.remove("open");
+    links.classList.remove("open");
+  }));
+}
+
+})();
 </script>
 </body>
 </html>
