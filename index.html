@@ -1135,9 +1135,12 @@ function boot(){
   }, 3900);
 }
 
-// Try to boot on load, fallback to immediate
-window.addEventListener("load", boot);
-setTimeout(boot, 100);
+// Boot immediately and also on load
+function tryBoot() {
+  if (!bootDone) boot();
+}
+tryBoot();
+window.addEventListener("load", tryBoot);
 
 /* ============================================================
    ANIMATION LOOP
