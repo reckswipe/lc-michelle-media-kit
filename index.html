@@ -449,6 +449,20 @@ nav.scrolled{
   .pillar-preview{display:none}
 }
 
+/* ---------- Pillar Videos ---------- */
+.pillar-videos{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem;
+  margin:2rem 0 3rem;padding:0 0 0 5rem;
+}
+.pillar-videos video{
+  width:100%;aspect-ratio:9/16;border-radius:4px;
+  object-fit:cover;background:var(--gold);
+}
+@media(max-width:768px){
+  .pillar-videos{grid-template-columns:repeat(2,1fr);padding:0}
+  .pillar-videos video{aspect-ratio:1/1}
+}
+
 /* ---------- Brands ---------- */
 .brands{padding:120px 0;background:var(--white);border-top:1px solid rgba(42,36,34,.08)}
 .brands .eyebrow-wrap{padding:0 6vw;max-width:1280px;margin:0 auto}
@@ -788,6 +802,11 @@ footer .copy{font-size:.66rem;letter-spacing:.22em;text-transform:uppercase}
         <span class="pillar-desc">Skincare routines, product demonstrations &amp; real textures on real skin.</span>
         <span class="pillar-arrow">→</span>
       </a>
+      <div class="pillar-videos" data-pillar="0">
+        <video src="http://lmichellebeauty.com/wp-content/uploads/2026/06/media-4.mp4" muted loop playsinline></video>
+        <video src="http://lmichellebeauty.com/wp-content/uploads/2026/06/media-15.mp4" muted loop playsinline></video>
+        <video src="http://lmichellebeauty.com/wp-content/uploads/2026/06/media-16.mp4" muted loop playsinline></video>
+      </div>
       <a class="pillar-row" data-preview="1" data-fade href="#contact">
         <span class="pillar-idx">No. 2</span>
         <span class="pillar-title">Skin-First Makeup</span>
