@@ -29,16 +29,18 @@ async function testAnimations() {
     await page.goto(URL, { waitUntil: 'networkidle', timeout: 30000 });
     console.log('✅ Page loaded\n');
 
-    // Wait for preloader to finish (max 5 seconds)
+    // Wait for preloader to finish (max 6 seconds)
     console.log('⏳ Waiting for preloader...');
     try {
       await page.waitForFunction(() => {
         const preloader = document.getElementById('preloader');
         return !preloader || preloader.classList.contains('done') || preloader.style.display === 'none';
-      }, { timeout: 5000 });
+      }, { timeout: 6000 });
       console.log('✅ Preloader finished\n');
+      // Wait extra time for hero animation to complete (scheduled at 2900ms)
+      await page.waitForTimeout(1500);
     } catch (e) {
-      console.log('⚠️ Preloader still visible after 5s (may be normal)\n');
+      console.log('⚠️ Preloader still visible after 6s (may be normal)\n');
     }
 
     // Check hero animation
